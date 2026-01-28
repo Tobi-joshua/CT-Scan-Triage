@@ -136,16 +136,19 @@ def apply_colormap_on_image(original_pil, cam_resized, colormap=cm.jet, alpha=0.
     overlay_uint8 = np.uint8(overlay * 255)
     return Image.fromarray(overlay_uint8)
 
+
 def save_colorbar(colormap=cm.jet, filename='heatmap_colorbar.png', vmin=0.0, vmax=1.0):
-    # create a fake ScalarMappable for colorbar
     sm = cm.ScalarMappable(cmap=colormap)
     sm.set_array(np.linspace(vmin, vmax, 256))
-    plt.figure(figsize=(2, 0.3))
-    plt.gca().set_visible(False)
-    cbar = plt.colorbar(sm, orientation='horizontal', fraction=0.5, pad=0.2)
+
+    # Create a figure and a dedicated axes for the colorbar
+    fig = plt.figure(figsize=(2, 0.3))
+    ax = fig.add_axes([0.05, 0.5, 0.9, 0.3])  # x, y, width, height in figure coords
+    cbar = plt.colorbar(sm, cax=ax, orientation='horizontal')
     cbar.ax.tick_params(labelsize=8)
     plt.savefig(filename, bbox_inches='tight', dpi=300)
-    plt.close()
+    plt.close(fig)
+
 
 
 # -------------------------
