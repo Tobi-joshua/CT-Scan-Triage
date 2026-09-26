@@ -1,0 +1,56 @@
+name: Train NIH multi-label CXR baseline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/train-nih-multilabel.yml"
+      - "scripts/train_nih_multilabel.py"
+      - "src/model.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: train-nih-multilabel
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install CPU PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          pip install "torch>=2.3,<3" "torchvision>=0.18,<1" --index-url https://download.pytorch.org/whl/cpu
+      - name: Install training dependencies
+        run: pip install "datasets>=3,<5" "scikit-learn>=1.4,<2" "Pillow>=10,<12" "numpy>=1.26,<3"
+      - name: Compile
+        run: python -m compileall src scripts/train_nih_multilabel.py
+      - name: Train NIH multi-label model
+        env:
+          PYTHONPATH: "."
+          HF_HUB_DISABLE_TELEMETRY: "1"
+        run: python scripts/train_nih_multilabel.py --train-n 16000 --test-n 4000 --epochs 2 --size 128
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cxr-nih-multilabel
+          path: |
+            artifacts/cxr_nih_multilabel.pt
+            artifacts/nih_multilabel_metrics.json
+          retention-days: 90
+      - name: Commit checkpoint and metrics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f artifacts/cxr_nih_multilabel.pt artifacts/nih_multilabel_metrics.json
+          git commit -m "Add NIH multi-label CXR baseline [skip ci]" || exit 0
+          git push
