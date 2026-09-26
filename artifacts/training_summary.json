@@ -1,0 +1,283 @@
+{
+  "dataset": "mmenendezg/pneumonia_x_ray",
+  "dataset_counts": {
+    "train": 4187,
+    "validation": 1045,
+    "test": 624
+  },
+  "classes": [
+    "normal",
+    "pneumonia"
+  ],
+  "input_size": 160,
+  "epochs": 4,
+  "batch_size": 64,
+  "seed": 2026,
+  "device": "cpu",
+  "best_validation_auc": 0.9932021998237075,
+  "test": {
+    "n": 624,
+    "auc": 0.981273285119439,
+    "accuracy": 0.9358974358974359,
+    "precision": 0.9605263157894737,
+    "recall_sensitivity": 0.9358974358974359,
+    "specificity": 0.9358974358974359,
+    "f1": 0.948051948051948,
+    "brier": 0.04900277204555416,
+    "ece_10": 0.014678451345142455,
+    "confusion_matrix": [
+      [
+        219,
+        15
+      ],
+      [
+        25,
+        365
+      ]
+    ],
+    "classification_report": {
+      "normal": {
+        "precision": 0.8975409836065574,
+        "recall": 0.9358974358974359,
+        "f1-score": 0.9163179916317992,
+        "support": 234.0
+      },
+      "pneumonia": {
+        "precision": 0.9605263157894737,
+        "recall": 0.9358974358974359,
+        "f1-score": 0.948051948051948,
+        "support": 390.0
+      },
+      "accuracy": 0.9358974358974359,
+      "macro avg": {
+        "precision": 0.9290336496980156,
+        "recall": 0.9358974358974359,
+        "f1-score": 0.9321849698418736,
+        "support": 624.0
+      },
+      "weighted avg": {
+        "precision": 0.93690681622088,
+        "recall": 0.9358974358974359,
+        "f1-score": 0.9361517143943923,
+        "support": 624.0
+      }
+    }
+  },
+  "checkpoint_sha256": "a77edac62327a48f607b56e7e5aa2fb9272f690ba178e56ada80a6dc7acdccfa",
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.2393999447615015,
+      "val": {
+        "n": 1045,
+        "auc": 0.9854654505039666,
+        "accuracy": 0.939712918660287,
+        "precision": 0.9772423025435074,
+        "recall_sensitivity": 0.9407216494845361,
+        "specificity": 0.9368029739776952,
+        "f1": 0.958634274458306,
+        "brier": 0.04410246934047875,
+        "ece_10": 0.014128008787046823,
+        "confusion_matrix": [
+          [
+            252,
+            17
+          ],
+          [
+            46,
+            730
+          ]
+        ],
+        "classification_report": {
+          "normal": {
+            "precision": 0.8456375838926175,
+            "recall": 0.9368029739776952,
+            "f1-score": 0.8888888888888888,
+            "support": 269.0
+          },
+          "pneumonia": {
+            "precision": 0.9772423025435074,
+            "recall": 0.9407216494845361,
+            "f1-score": 0.958634274458306,
+            "support": 776.0
+          },
+          "accuracy": 0.939712918660287,
+          "macro avg": {
+            "precision": 0.9114399432180624,
+            "recall": 0.9387623117311157,
+            "f1-score": 0.9237615816735973,
+            "support": 1045.0
+          },
+          "weighted avg": {
+            "precision": 0.9433651070247616,
+            "recall": 0.939712918660287,
+            "f1-score": 0.94068067759881,
+            "support": 1045.0
+          }
+        }
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.13158418081748846,
+      "val": {
+        "n": 1045,
+        "auc": 0.9894416126930594,
+        "accuracy": 0.9483253588516747,
+        "precision": 0.9839142091152815,
+        "recall_sensitivity": 0.9458762886597938,
+        "specificity": 0.9553903345724907,
+        "f1": 0.9645203679369251,
+        "brier": 0.038734528596829944,
+        "ece_10": 0.013746786833647617,
+        "confusion_matrix": [
+          [
+            257,
+            12
+          ],
+          [
+            42,
+            734
+          ]
+        ],
+        "classification_report": {
+          "normal": {
+            "precision": 0.8595317725752508,
+            "recall": 0.9553903345724907,
+            "f1-score": 0.9049295774647887,
+            "support": 269.0
+          },
+          "pneumonia": {
+            "precision": 0.9839142091152815,
+            "recall": 0.9458762886597938,
+            "f1-score": 0.9645203679369251,
+            "support": 776.0
+          },
+          "accuracy": 0.9483253588516747,
+          "macro avg": {
+            "precision": 0.9217229908452662,
+            "recall": 0.9506333116161423,
+            "f1-score": 0.9347249727008569,
+            "support": 1045.0
+          },
+          "weighted avg": {
+            "precision": 0.9518961465035416,
+            "recall": 0.9483253588516747,
+            "f1-score": 0.9491807290498393,
+            "support": 1045.0
+          }
+        }
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.1176054829472228,
+      "val": {
+        "n": 1045,
+        "auc": 0.9914392749013146,
+        "accuracy": 0.9492822966507177,
+        "precision": 0.9945280437756497,
+        "recall_sensitivity": 0.9368556701030928,
+        "specificity": 0.9851301115241635,
+        "f1": 0.9648307896483079,
+        "brier": 0.04201095590683279,
+        "ece_10": 0.01775931341151582,
+        "confusion_matrix": [
+          [
+            265,
+            4
+          ],
+          [
+            49,
+            727
+          ]
+        ],
+        "classification_report": {
+          "normal": {
+            "precision": 0.8439490445859873,
+            "recall": 0.9851301115241635,
+            "f1-score": 0.9090909090909091,
+            "support": 269.0
+          },
+          "pneumonia": {
+            "precision": 0.9945280437756497,
+            "recall": 0.9368556701030928,
+            "f1-score": 0.9648307896483079,
+            "support": 776.0
+          },
+          "accuracy": 0.9492822966507177,
+          "macro avg": {
+            "precision": 0.9192385441808185,
+            "recall": 0.9609928908136282,
+            "f1-score": 0.9369608493696084,
+            "support": 1045.0
+          },
+          "weighted avg": {
+            "precision": 0.9557665597737175,
+            "recall": 0.9492822966507177,
+            "f1-score": 0.9504824376196569,
+            "support": 1045.0
+          }
+        }
+      }
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.09666742808033152,
+      "val": {
+        "n": 1045,
+        "auc": 0.9932021998237075,
+        "accuracy": 0.9253588516746412,
+        "precision": 0.9957386363636364,
+        "recall_sensitivity": 0.9033505154639175,
+        "specificity": 0.9888475836431226,
+        "f1": 0.9472972972972973,
+        "brier": 0.05605334976450924,
+        "ece_10": 0.02927511195920017,
+        "confusion_matrix": [
+          [
+            266,
+            3
+          ],
+          [
+            75,
+            701
+          ]
+        ],
+        "classification_report": {
+          "normal": {
+            "precision": 0.7800586510263929,
+            "recall": 0.9888475836431226,
+            "f1-score": 0.8721311475409836,
+            "support": 269.0
+          },
+          "pneumonia": {
+            "precision": 0.9957386363636364,
+            "recall": 0.9033505154639175,
+            "f1-score": 0.9472972972972973,
+            "support": 776.0
+          },
+          "accuracy": 0.9253588516746412,
+          "macro avg": {
+            "precision": 0.8878986436950147,
+            "recall": 0.9460990495535201,
+            "f1-score": 0.9097142224191405,
+            "support": 1045.0
+          },
+          "weighted avg": {
+            "precision": 0.9402190994682118,
+            "recall": 0.9253588516746412,
+            "f1-score": 0.9279483075514137,
+            "support": 1045.0
+          }
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Single pediatric source dataset; not representative of adult emergency imaging.",
+    "Binary pneumonia classification only; this is not yet the full multi-condition triage task.",
+    "Transfer-learning baseline with frozen convolutional features.",
+    "Research use only; not clinically validated."
+  ]
+}
