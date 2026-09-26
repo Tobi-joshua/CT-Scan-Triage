@@ -1,5 +1,6 @@
-torch>=2.3,<3
-torchvision>=0.18,<1
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.10.0+cpu
+torchvision==0.25.0+cpu
 streamlit>=1.38,<2
 numpy>=1.26,<3
 Pillow>=10,<12
