@@ -1,0 +1,41 @@
+name: Recover trained ensemble artifact
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/recover-ensemble.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download successful ensemble artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf recovered
+          mkdir -p recovered
+          gh run download 36232854685 -n pediatric-cxr-ensemble -D recovered
+          ls -lh recovered
+      - name: Commit recovered weights and metrics safely
+        run: |
+          mkdir -p artifacts
+          cp recovered/cxr_seed_2027.pt artifacts/
+          cp recovered/cxr_seed_2028.pt artifacts/
+          cp recovered/ensemble_metrics.json artifacts/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f artifacts/cxr_seed_2027.pt artifacts/cxr_seed_2028.pt artifacts/ensemble_metrics.json
+          git commit -m "Recover trained pediatric CXR ensemble [skip ci]" || exit 0
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
