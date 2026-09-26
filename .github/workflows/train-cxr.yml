@@ -1,0 +1,58 @@
+name: Train real CXR baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/train-cxr.yml"
+      - "scripts/train_hf_baseline.py"
+      - "src/model.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: train-cxr-baseline
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install training dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "torch>=2.3,<3" "torchvision>=0.18,<1" "datasets>=3,<5" "scikit-learn>=1.4,<2" "Pillow>=10,<12" "numpy>=1.26,<3"
+
+      - name: Train and evaluate
+        env:
+          HF_HUB_DISABLE_TELEMETRY: "1"
+        run: |
+          python scripts/train_hf_baseline.py --epochs 4 --batch-size 64 --size 160 --out artifacts/cxr_mobilenetv3.pt
+
+      - name: Upload reproducibility artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cxr-mobilenetv3-baseline
+          path: |
+            artifacts/cxr_mobilenetv3.pt
+            artifacts/training_summary.json
+            artifacts/test_metrics.json
+          retention-days: 90
+
+      - name: Commit trained checkpoint and metrics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f artifacts/cxr_mobilenetv3.pt artifacts/training_summary.json artifacts/test_metrics.json
+          git commit -m "Add trained CXR baseline and metrics [skip ci]" || exit 0
+          git push
