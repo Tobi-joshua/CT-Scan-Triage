@@ -3,7 +3,11 @@ services:
     name: chest-imaging-triage
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    branch: main
+    buildCommand: |
+      python -m pip install --upgrade pip
+      pip install "torch>=2.3,<3" "torchvision>=0.18,<1" --index-url https://download.pytorch.org/whl/cpu
+      pip install -r requirements-app.txt
     startCommand: streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
     healthCheckPath: /
-    autoDeploy: true
+    autoDeployTrigger: commit
