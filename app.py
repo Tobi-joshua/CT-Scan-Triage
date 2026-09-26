@@ -12,7 +12,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-from src.model import build_model, mc_predict, mc_predict_multilabel
+from src.model import build_model, mc_predict, mc_predict_multilabel, gradcam_target_layer
 from src.ensemble import ensemble_predict
 from src.gradcam import GradCAM, overlay_cam
 from src.data import IMAGENET_MEAN, IMAGENET_STD
@@ -41,6 +41,7 @@ def load_checkpoint(path_string: str):
         len(ckpt["classes"]),
         dropout=float(ckpt.get("dropout", 0.30)),
         pretrained=False,
+        architecture=ckpt.get("architecture", "mobilenet_v3_small"),
     )
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
@@ -69,7 +70,13 @@ def uploaded_to_pil(upload, modality: str) -> Image.Image:
         return Image.fromarray(np.uint8(arr * 255)).convert("RGB")
     return Image.open(io.BytesIO(raw)).convert("RGB")
 
-def model_transform(size: int):
+def model_transform(size: int, architecture: str = "mobilenet_v3_small"):
+    if architecture == "tiny_cxr":
+        return transforms.Compose([
+            transforms.Resize((size, size)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ])
     return transforms.Compose([
         transforms.Resize((size, size)),
         transforms.ToTensor(),
@@ -181,14 +188,14 @@ if image is not None:
     elif selected_model == "Pediatric pneumonia baseline":
         model, ckpt = ped_model, ped_ckpt
         size = int(ckpt.get("input_size", 160))
-        x = model_transform(size)(image).unsqueeze(0)
+        x = model_transform(size, ckpt.get("architecture", "mobilenet_v3_small"))(image).unsqueeze(0)
 
         t0 = time.perf_counter()
         mean, var, entropy, mi = mc_predict(model, x, passes=20)
         latency_ms = (time.perf_counter() - t0) * 1000
         idx = int(mean.argmax(1).item())
 
-        cam_engine = GradCAM(model, model.features[-1])
+        cam_engine = GradCAM(model, gradcam_target_layer(model, ckpt.get("architecture", "mobilenet_v3_small")))
         cam, _ = cam_engine(x, idx)
         cam_engine.close()
         right.image(overlay_cam(image, cam), caption="Grad-CAM explanation", use_container_width=True)
@@ -206,14 +213,14 @@ if image is not None:
 
     elif selected_model == "Pediatric pneumonia deep ensemble":
         size = int(ensemble_ckpts[0].get("input_size", 160))
-        x = model_transform(size)(image).unsqueeze(0)
+        x = model_transform(size, ckpt.get("architecture", "mobilenet_v3_small"))(image).unsqueeze(0)
 
         t0 = time.perf_counter()
         mean, var, entropy, mi = ensemble_predict(ensemble_models, x)
         latency_ms = (time.perf_counter() - t0) * 1000
         idx = int(mean.argmax(1).item())
 
-        cam_engine = GradCAM(ensemble_models[0], ensemble_models[0].features[-1])
+        cam_engine = GradCAM(ensemble_models[0], gradcam_target_layer(ensemble_models[0], ensemble_ckpts[0].get("architecture", "mobilenet_v3_small")))
         cam, _ = cam_engine(x, idx)
         cam_engine.close()
         right.image(
@@ -236,7 +243,7 @@ if image is not None:
     elif selected_model == "Adult NIH 14-finding baseline":
         model, ckpt = nih_model, nih_ckpt
         size = int(ckpt.get("input_size", 128))
-        x = model_transform(size)(image).unsqueeze(0)
+        x = model_transform(size, ckpt.get("architecture", "mobilenet_v3_small"))(image).unsqueeze(0)
 
         t0 = time.perf_counter()
         mean, var, entropy, mi = mc_predict_multilabel(model, x, passes=20)
@@ -246,7 +253,7 @@ if image is not None:
         top = order[:5]
         target_idx = top[0]
 
-        cam_engine = GradCAM(model, model.features[-1])
+        cam_engine = GradCAM(model, gradcam_target_layer(model, ckpt.get("architecture", "mobilenet_v3_small")))
         cam, _ = cam_engine(x, target_idx)
         cam_engine.close()
         right.image(
