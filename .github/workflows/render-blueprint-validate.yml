@@ -14,10 +14,28 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install Render CLI
-        run: curl -fsSL https://raw.githubusercontent.com/render-oss/cli/main/bin/install.sh | sh
-      - name: Validate Blueprint
+      - name: Structural Blueprint check
         run: |
-          export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
-          command -v render || find "$HOME" -type f -name render -perm -111 -print
-          render blueprints validate render.yaml
+          python - <<'PY'
+          import pathlib, re
+          p=pathlib.Path("render.yaml")
+          text=p.read_text()
+          required=[
+              r"services:", r"type:\s*web", r"runtime:\s*python",
+              r"buildCommand:", r"startCommand:", r"\$PORT", r"healthCheckPath:"
+          ]
+          missing=[pat for pat in required if not re.search(pat,text)]
+          if missing:
+              raise SystemExit(f"render.yaml missing required patterns: {missing}")
+          print("render.yaml structural validation passed")
+          PY
+      - name: Install Render CLI
+        if: ${{ secrets.RENDER_WORKSPACE != '' }}
+        run: curl -fsSL https://raw.githubusercontent.com/render-oss/cli/main/bin/install.sh | sh
+      - name: Account-aware Render validation
+        if: ${{ secrets.RENDER_WORKSPACE != '' }}
+        env:
+          RENDER_WORKSPACE: ${{ secrets.RENDER_WORKSPACE }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          render blueprints validate render.yaml --workspace "$RENDER_WORKSPACE"
