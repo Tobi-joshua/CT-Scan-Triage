@@ -1,15 +1,18 @@
 from __future__ import annotations
+
 from pathlib import Path
 import io
 import json
 import time
 
+import numpy as np
+import pydicom
 import streamlit as st
 import torch
 from PIL import Image
 from torchvision import transforms
 
-from src.model import build_model, mc_predict
+from src.model import build_model, mc_predict, mc_predict_multilabel
 from src.gradcam import GradCAM, overlay_cam
 from src.data import IMAGENET_MEAN, IMAGENET_STD
 
@@ -20,14 +23,17 @@ st.warning(
     "or clinical decision-making."
 )
 
-MODEL_PATH = Path("artifacts/cxr_mobilenetv3.pt")
-METRICS_PATH = Path("artifacts/test_metrics.json")
+PED_PATH = Path("artifacts/cxr_mobilenetv3.pt")
+PED_METRICS = Path("artifacts/test_metrics.json")
+NIH_PATH = Path("artifacts/cxr_nih_multilabel.pt")
+NIH_METRICS = Path("artifacts/nih_multilabel_metrics.json")
 
 @st.cache_resource
-def load_model():
-    if not MODEL_PATH.exists():
+def load_checkpoint(path_string: str):
+    path = Path(path_string)
+    if not path.exists():
         return None, None
-    ckpt = torch.load(MODEL_PATH, map_location="cpu")
+    ckpt = torch.load(path, map_location="cpu")
     model = build_model(
         len(ckpt["classes"]),
         dropout=float(ckpt.get("dropout", 0.30)),
@@ -37,76 +43,167 @@ def load_model():
     model.eval()
     return model, ckpt
 
-model, ckpt = load_model()
+def uploaded_to_pil(upload, modality: str) -> Image.Image:
+    name = upload.name.lower()
+    raw = upload.getvalue()
+    if name.endswith((".dcm", ".dicom")):
+        ds = pydicom.dcmread(io.BytesIO(raw))
+        arr = ds.pixel_array.astype(np.float32)
+        if modality.startswith("CT"):
+            slope = float(getattr(ds, "RescaleSlope", 1.0))
+            intercept = float(getattr(ds, "RescaleIntercept", 0.0))
+            hu = arr * slope + intercept
+            center, width = -600.0, 1500.0
+            lo, hi = center - width / 2, center + width / 2
+            arr = np.clip(hu, lo, hi)
+        else:
+            lo, hi = np.percentile(arr, [1, 99])
+            arr = np.clip(arr, lo, hi)
+        arr -= arr.min()
+        arr /= max(float(arr.max()), 1e-6)
+        if getattr(ds, "PhotometricInterpretation", "") == "MONOCHROME1":
+            arr = 1.0 - arr
+        return Image.fromarray(np.uint8(arr * 255)).convert("RGB")
+    return Image.open(io.BytesIO(raw)).convert("RGB")
+
+def model_transform(size: int):
+    return transforms.Compose([
+        transforms.Resize((size, size)),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+    ])
+
+ped_model, ped_ckpt = load_checkpoint(str(PED_PATH))
+nih_model, nih_ckpt = load_checkpoint(str(NIH_PATH))
 
 with st.sidebar:
-    st.header("Model status")
-    if model is None:
-        st.error("No trained CXR checkpoint found.")
+    st.header("System status")
+    if ped_model is not None:
+        st.success("Pediatric pneumonia baseline loaded")
+        if PED_METRICS.exists():
+            m = json.loads(PED_METRICS.read_text())
+            st.metric("Pediatric test AUC", f"{m['auc']:.3f}")
+            st.caption(f"Sensitivity {m['recall_sensitivity']:.3f} • Specificity {m['specificity']:.3f}")
     else:
-        st.success("Trained CXR baseline loaded.")
-        st.caption(f"Dataset: {ckpt.get('dataset', 'unknown')}")
-        st.caption(f"Input size: {ckpt.get('input_size', 224)} px")
-    if METRICS_PATH.exists():
-        metrics = json.loads(METRICS_PATH.read_text())
-        st.metric("Held-out test AUC", f"{metrics.get('auc', float('nan')):.3f}")
-        st.metric("Sensitivity", f"{metrics.get('recall_sensitivity', float('nan')):.3f}")
-        st.metric("Specificity", f"{metrics.get('specificity', float('nan')):.3f}")
+        st.error("Pediatric checkpoint missing")
+
+    if nih_model is not None:
+        st.success("Adult NIH multi-label baseline loaded")
+        if NIH_METRICS.exists():
+            n = json.loads(NIH_METRICS.read_text())
+            auc = n.get("metrics", {}).get("macro_auc_available_labels")
+            if auc is not None:
+                st.metric("NIH subset macro AUC", f"{auc:.3f}")
+    else:
+        st.info("Adult NIH multi-label checkpoint not yet available")
 
 modality = st.radio("Modality", ["Chest X-ray", "CT (preview only)"], horizontal=True)
-file = st.file_uploader("Upload a de-identified PNG/JPEG image", type=["png", "jpg", "jpeg"])
+
+available_models = []
+if ped_model is not None:
+    available_models.append("Pediatric pneumonia baseline")
+if nih_model is not None:
+    available_models.append("Adult NIH 14-finding baseline")
+
+selected_model = None
+if modality == "Chest X-ray" and available_models:
+    selected_model = st.selectbox("Research model", available_models)
 
 if modality.startswith("CT"):
     st.info(
-        "CT is intentionally a separate model track. The current checkpoint is a chest-X-ray "
-        "pneumonia baseline and will not be applied to CT."
+        "CT is a separate research track. DICOM CT slices can be previewed with lung-window "
+        "normalization, but no CXR model will be applied to them."
     )
 
-if file:
-    image = Image.open(io.BytesIO(file.getvalue())).convert("RGB")
-    left, right = st.columns(2)
-    left.image(image, caption="Input", use_container_width=True)
+upload = st.file_uploader(
+    "Upload a de-identified chest image",
+    type=["png", "jpg", "jpeg", "dcm", "dicom"],
+    help="Do not upload identifiable patient data to this public research demo.",
+)
 
-    if model is None:
-        right.info(
-            "Training has not produced artifacts/cxr_mobilenetv3.pt yet. "
-            "The app will not fabricate a medical prediction."
-        )
-    elif modality.startswith("Chest"):
-        size = int(ckpt.get("input_size", 224))
-        tfm = transforms.Compose([
-            transforms.Resize((size, size)),
-            transforms.ToTensor(),
-            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
-        ])
-        x = tfm(image).unsqueeze(0)
+if upload:
+    try:
+        image = uploaded_to_pil(upload, modality)
+    except Exception as exc:
+        st.error(f"Could not decode the uploaded image: {exc}")
+        st.stop()
+
+    left, right = st.columns(2)
+    left.image(image, caption="De-identified input preview", use_container_width=True)
+
+    if modality.startswith("CT"):
+        right.info("CT preview only — no diagnostic or triage prediction is produced.")
+    elif not available_models:
+        right.error("No trained CXR checkpoint is available.")
+    elif selected_model == "Pediatric pneumonia baseline":
+        model, ckpt = ped_model, ped_ckpt
+        size = int(ckpt.get("input_size", 160))
+        x = model_transform(size)(image).unsqueeze(0)
 
         t0 = time.perf_counter()
         mean, var, entropy, mi = mc_predict(model, x, passes=20)
         latency_ms = (time.perf_counter() - t0) * 1000
-
         idx = int(mean.argmax(1).item())
-        classes = ckpt["classes"]
+
         cam_engine = GradCAM(model, model.features[-1])
         cam, _ = cam_engine(x, idx)
         cam_engine.close()
-        overlay = overlay_cam(image, cam)
-        right.image(overlay, caption="Grad-CAM explanation", use_container_width=True)
+        right.image(overlay_cam(image, cam), caption="Grad-CAM explanation", use_container_width=True)
 
         st.subheader("Research output")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Predicted class", classes[idx])
+        c1.metric("Predicted class", ckpt["classes"][idx])
         c2.metric("Mean probability", f"{mean[0, idx].item():.3f}")
         c3.metric("Predictive entropy", f"{entropy.item():.3f}")
         c4.metric("20-pass latency", f"{latency_ms:.0f} ms")
         st.caption(
             f"Epistemic uncertainty (mutual information): {mi.item():.4f}. "
-            "Uncertainty values are descriptive research outputs, not clinical confidence guarantees."
+            "This is a pediatric pneumonia research baseline, not an emergency triage decision."
+        )
+
+    elif selected_model == "Adult NIH 14-finding baseline":
+        model, ckpt = nih_model, nih_ckpt
+        size = int(ckpt.get("input_size", 128))
+        x = model_transform(size)(image).unsqueeze(0)
+
+        t0 = time.perf_counter()
+        mean, var, entropy, mi = mc_predict_multilabel(model, x, passes=20)
+        latency_ms = (time.perf_counter() - t0) * 1000
+        probs = mean[0]
+        order = torch.argsort(probs, descending=True).tolist()
+        top = order[:5]
+        target_idx = top[0]
+
+        cam_engine = GradCAM(model, model.features[-1])
+        cam, _ = cam_engine(x, target_idx)
+        cam_engine.close()
+        right.image(
+            overlay_cam(image, cam),
+            caption=f"Grad-CAM for {ckpt['classes'][target_idx]}",
+            use_container_width=True,
+        )
+
+        st.subheader("Multi-label research output")
+        rows = []
+        for i in top:
+            rows.append({
+                "Finding": ckpt["classes"][i],
+                "Probability": round(float(mean[0, i]), 4),
+                "MC variance": round(float(var[0, i]), 6),
+                "Predictive entropy": round(float(entropy[0, i]), 4),
+                "Mutual information": round(float(mi[0, i]), 6),
+            })
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+        st.caption(
+            f"20-pass inference latency: {latency_ms:.0f} ms. Probabilities are not clinically "
+            "thresholded or calibrated for patient-care decisions."
         )
 
 st.divider()
+st.markdown("### Scope")
 st.caption(
-    "Current scope: pediatric chest-X-ray pneumonia baseline. "
-    "External validation, adult emergency-imaging data, multi-condition triage, calibration refinement, "
-    "and CT-specific modeling remain required before the broader preprint concept is validated."
+    "The deployed system is a reproducible research prototype. The pediatric binary model is "
+    "validated only on its held-out source split. The NIH model, when available, is trained on "
+    "text-mined multi-label radiographs. External validation, prospective evaluation, domain-shift "
+    "testing, clinician studies, and a dedicated CT model remain required."
 )
