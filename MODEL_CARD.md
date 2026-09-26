@@ -56,3 +56,17 @@ These results validate only the software baseline on one pediatric source datase
 ## Reproducibility
 
 The exact workflow is `.github/workflows/train-cxr.yml`; detailed epoch history is stored in `artifacts/training_summary.json`.
+
+## Deep ensemble extension
+
+A three-member ensemble using seeds 2026, 2027 and 2028 was evaluated on the same 624-image held-out test split.
+
+- ROC AUC: 0.9827
+- Accuracy: 0.9327
+- Sensitivity: 0.9538
+- Specificity: 0.8974
+- F1: 0.9466
+- Mean between-model probability variance: 0.002651
+- Confusion matrix: [[210, 24], [18, 372]]
+
+The ensemble supports the uncertainty-analysis component of the research prototype by exposing disagreement between independently trained models. These source-dataset results do not establish clinical uncertainty calibration or safety.
