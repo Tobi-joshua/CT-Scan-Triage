@@ -43,6 +43,21 @@ Confusion matrix (true rows, predicted columns; normal then pneumonia):
 ```
 
 These results apply only to this pediatric source dataset. They do **not** establish performance for adult emergency-department populations, CT, other pathologies, other hospitals/scanners, or prospective clinical use. See [MODEL_CARD.md](MODEL_CARD.md).
+### Three-member deep ensemble
+
+The same held-out pediatric test split was also evaluated with three independently seeded MobileNetV3-Small members (2026, 2027, 2028):
+
+| Metric | Result |
+|---|---:|
+| ROC AUC | **0.9827** |
+| Accuracy | **0.9327** |
+| Sensitivity | **0.9538** |
+| Specificity | **0.8974** |
+| F1 | **0.9466** |
+| Mean between-model variance | **0.00265** |
+
+The ensemble is included to demonstrate epistemic uncertainty through model disagreement; it is not evidence of clinical safety or generalization.
+
 
 ## Run the app
 
