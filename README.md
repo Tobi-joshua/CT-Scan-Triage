@@ -1,185 +1,66 @@
 # CT-Scan-Triage
 
-CT-Scan-Triage is a lightweight, CPU-based Grad-CAM visualization pipeline for CT scan images.
-It is designed for model interpretability, medical imaging explainability, and research demos.
+Research implementation accompanying **Development of a Lightweight AI-Assisted Triage Pipeline for Chest Imaging**.
 
-The project produces:
-- Heatmap overlays on CT images using Grad-CAM
-- A standalone horizontal colorbar image
-- Fully reproducible outputs using PyTorch and matplotlib
+> **Research prototype only — not a medical device and not validated for diagnosis or clinical decision-making.**
 
----
+## Current architecture
 
-## Key Features
+The repository now separates the two imaging modalities rather than mixing them into one classifier:
 
-- Grad-CAM implementation from scratch (no third-party explainability libs)
-- Works entirely on CPU (no CUDA required)
-- Compatible with pretrained or custom-trained models
-- Saves publication-ready overlay images (300 DPI)
-- Generates a separate colorbar for UI / paper figures
-- Clean, minimal, research-friendly structure
+- **Chest X-ray track:** patient-level preparation of the RSNA/NIH pneumonia data, MobileNetV3-Small transfer learning, calibration-ready probabilities, Monte Carlo Dropout uncertainty, and Grad-CAM.
+- **CT track:** data provenance and preparation plan for TCIA/LIDC-IDRI. CT inference remains disabled in the demo until a dedicated CT model is trained and evaluated.
+- **Demo:** Streamlit upload interface for a de-identified CXR, predicted class/probability, predictive entropy, mutual information, latency, and Grad-CAM.
 
----
-
-## Dependencies
-
-- Python 3.10+
-- torch
-- torchvision
-- pillow
-- numpy
-- matplotlib
-
----
-
-## Environment Setup
-
-Create and activate a virtual environment:
+## Setup
 
 ```bash
-python -m venv venv
-source venv/bin/activate
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Install dependencies (CPU-only PyTorch):
+## Prepare RSNA chest X-rays
+
+Download the RSNA Pneumonia Detection Challenge images and detailed class CSV under the dataset's terms. Keep raw data outside Git.
 
 ```bash
-pip install --upgrade pip
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install pillow matplotlib numpy
+python scripts/prepare_rsna.py \
+  --dicom-dir /path/to/stage_2_train_images \
+  --class-csv /path/to/stage_2_detailed_class_info.csv \
+  --out data/cxr
 ```
 
----
+The script creates deterministic patient-level train/validation/test folders and excludes the ambiguous `No Lung Opacity / Not Normal` class from the first binary baseline.
 
-## Running the Script
-
-Activate the virtual environment:
+## Train
 
 ```bash
-source venv/bin/activate
+python train.py --data data/cxr --epochs 10 --out artifacts/cxr_mobilenetv3.pt
 ```
 
-Run the Grad-CAM pipeline:
+## Run Streamlit
 
 ```bash
-python gradcam_overlay.py
+streamlit run app.py
 ```
 
----
+The app expects `artifacts/cxr_mobilenetv3.pt`. Model weights are intentionally not fabricated or committed before training.
 
-## What the Script Does
-
-1. Loads a CT image from disk
-2. Preprocesses the image using ImageNet normalization
-3. Passes the image through a pretrained ResNet18 model
-4. Computes Grad-CAM using gradients from the final convolutional layer
-5. Resizes the heatmap to match the original image
-6. Overlays the heatmap on the original CT image
-7. Saves:
-   - Heatmap overlay image
-   - Standalone horizontal colorbar image
-
----
-
-## Configuration
-
-Edit these variables in `gradcam_overlay.py`:
-
-```python
-image_path = 'images/ct_synthetic.png'
-overlay_out = 'images/ui_mockup_overlay.png'
-colorbar_out = 'images/heatmap_colorbar.png'
-input_size = (224, 224)
-```
-
-To change the Grad-CAM target layer:
-
-```python
-target_layer = model.layer4[-1].conv2
-```
-
----
-
-## Project Structure
+## Repository layout
 
 ```
-CT-Scan-Triage/
-├── gradcam_overlay.py
-├── images/
-│   ├── ct_synthetic.png
-│   ├── ui_mockup_overlay.png
-│   └── heatmap_colorbar.png
-├── README.md
-├── requirements.txt
-└── venv/
+app.py                  Streamlit research demo
+train.py                CXR training entry point
+scripts/prepare_rsna.py RSNA DICOM -> patient-level PNG split
+src/data.py             transforms/loaders
+src/model.py            MobileNetV3 + MC Dropout
+src/gradcam.py          Grad-CAM implementation
+docs/DATASETS.md        dataset provenance/licensing plan
+artifacts/              local checkpoints (do not commit large weights)
 ```
 
----
+## Reproducibility / safety
 
-## Project Status
-
-This repository represents an **early-stage research scaffold**, not a finished medical AI system.
-The current implementation focuses on demonstrating feasibility, visualization capability, and
-overall pipeline direction.
-
-The code is intentionally lightweight and modular to allow rapid iteration.
-
----
-
-## What This Is (Right Now)
-
-- A **proof-of-concept** CT-image triage pipeline
-- A **baseline CNN + Grad-CAM explainability demo**
-- A starting point for research, not a clinical tool
-
----
-
-## What This Is NOT (Yet)
-
-- A clinically validated diagnostic system
-- A deployable hospital-grade AI
-- A final research contribution
-
----
-
-## Main TODO Roadmap
-
-### Phase 1 — Data & Problem Definition (Highest Priority)
-- Define triage labels (binary vs multi-class)
-- Select and document CT datasets
-- Establish clinical motivation and decision boundaries
-- Address class imbalance and data bias
-
-### Phase 2 — Model Training & Evaluation
-- Replace ImageNet-only baselines with task-trained models
-- Perform cross-validation
-- Evaluate calibration and uncertainty
-- Compare multiple architectures
-
-### Phase 3 — Explainability Validation
-- Quantitatively assess Grad-CAM heatmaps
-- Compare explainability methods
-- Analyze failure and misleading explanations
-
-### Phase 4 — Triage Pipeline Design
-- Implement multi-stage triage logic
-- Confidence-based case routing
-- Latency and efficiency analysis
-- Risk-aware decision thresholds
-
----
-
-## Research Direction
-
-The long-term goal is to develop a **lightweight, explainable, and risk-aware AI-assisted triage
-pipeline** for medical imaging that prioritizes safety, transparency, and clinical relevance.
-
-Future iterations will expand the pipeline with stronger datasets, validation, and domain expertise.
-"""
-
-
-## License
-
-MIT License
-
-Copyright (c) 2026 Tobi Joshua
+Do not commit patient data. Keep dataset versions, licenses, split seed/rule, preprocessing, model checkpoint hashes, and evaluation metrics with each experiment. A clinically meaningful release still requires held-out and external validation, calibration analysis, subgroup analysis where metadata permits, and clinician evaluation.

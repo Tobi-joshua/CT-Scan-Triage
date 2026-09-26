@@ -1,25 +1,24 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Virtual environments
+*.py[cod]
+.venv/
 venv/
-.env/
+.env
 
-# Jupyter
-.ipynb_checkpoints/
-
-# OS
-.DS_Store
-
-# Data
+# Data / medical images
 data/
-*.nii
-*.nii.gz
+*.dcm
+*.dicom
 
-# Models
-checkpoints/
-models/
+# Training outputs
+artifacts/*.pt
+artifacts/*.pth
+artifacts/*.ckpt
+artifacts/*.onnx
+runs/
+wandb/
 
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
