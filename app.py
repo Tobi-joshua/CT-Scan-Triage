@@ -100,7 +100,11 @@ with st.sidebar:
         if PED_METRICS.exists():
             m = json.loads(PED_METRICS.read_text())
             st.metric("Pediatric test AUC", f"{m['auc']:.3f}")
-            st.caption(f"Sensitivity {m['recall_sensitivity']:.3f} • Specificity {m['specificity']:.3f}")
+            sens=m.get("recall_sensitivity"); spec=m.get("specificity")
+            if sens is not None and spec is not None:
+                st.caption(f"Sensitivity {sens:.3f} • Specificity {spec:.3f}")
+            elif m.get("accuracy") is not None:
+                st.caption(f"Held-out accuracy {m['accuracy']:.3f}")
     else:
         st.error("Pediatric checkpoint missing")
 
