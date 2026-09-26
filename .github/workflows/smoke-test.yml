@@ -1,0 +1,32 @@
+name: Inference smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/smoke-test.yml"
+      - "scripts/smoke_inference.py"
+      - "app.py"
+      - "src/**"
+      - "artifacts/cxr_mobilenetv3.pt"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install "torch>=2.3,<3" "torchvision>=0.18,<1" --index-url https://download.pytorch.org/whl/cpu
+          pip install "numpy>=1.26,<3" "Pillow>=10,<12" "matplotlib>=3.8,<4"
+      - name: Run model + MC Dropout + Grad-CAM smoke test
+        env:
+          PYTHONPATH: "."
+        run: python scripts/smoke_inference.py
