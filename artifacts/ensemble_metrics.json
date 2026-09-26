@@ -1,0 +1,24 @@
+{
+  "members": [
+    "artifacts/cxr_mobilenetv3.pt",
+    "artifacts/cxr_seed_2027.pt",
+    "artifacts/cxr_seed_2028.pt"
+  ],
+  "n": 624,
+  "auc": 0.982741617357002,
+  "accuracy": 0.9326923076923077,
+  "sensitivity": 0.9538461538461539,
+  "specificity": 0.8974358974358975,
+  "f1": 0.9465648854961832,
+  "mean_between_model_variance": 0.0026512527838349342,
+  "confusion_matrix": [
+    [
+      210,
+      24
+    ],
+    [
+      18,
+      372
+    ]
+  ]
+}
