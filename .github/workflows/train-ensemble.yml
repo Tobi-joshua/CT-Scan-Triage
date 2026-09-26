@@ -1,0 +1,54 @@
+name: Train pediatric deep ensemble
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/train-ensemble.yml"
+      - "src/ensemble.py"
+      - "scripts/evaluate_ensemble.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ensemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install CPU training stack
+        run: |
+          python -m pip install --upgrade pip
+          pip install "torch>=2.3,<3" "torchvision>=0.18,<1" --index-url https://download.pytorch.org/whl/cpu
+          pip install "datasets>=3,<5" "scikit-learn>=1.4,<2" "Pillow>=10,<12" "numpy>=1.26,<3"
+      - name: Train member seed 2027
+        env: {PYTHONPATH: ".", HF_HUB_DISABLE_TELEMETRY: "1"}
+        run: python scripts/train_hf_baseline.py --epochs 4 --batch-size 64 --size 160 --seed 2027 --out artifacts/cxr_seed_2027.pt
+      - name: Train member seed 2028
+        env: {PYTHONPATH: ".", HF_HUB_DISABLE_TELEMETRY: "1"}
+        run: python scripts/train_hf_baseline.py --epochs 4 --batch-size 64 --size 160 --seed 2028 --out artifacts/cxr_seed_2028.pt
+      - name: Evaluate three-member ensemble
+        env: {PYTHONPATH: "."}
+        run: |
+          python scripts/evaluate_ensemble.py --checkpoints             artifacts/cxr_mobilenetv3.pt             artifacts/cxr_seed_2027.pt             artifacts/cxr_seed_2028.pt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pediatric-cxr-ensemble
+          path: |
+            artifacts/cxr_seed_2027.pt
+            artifacts/cxr_seed_2028.pt
+            artifacts/ensemble_metrics.json
+          retention-days: 90
+      - name: Commit ensemble artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f artifacts/cxr_seed_2027.pt artifacts/cxr_seed_2028.pt artifacts/ensemble_metrics.json
+          git commit -m "Add pediatric CXR ensemble artifacts [skip ci]" || exit 0
+          git push
