@@ -1,0 +1,43 @@
+name: Streamlit runtime smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/runtime-smoke.yml"
+      - "app.py"
+      - "requirements-app.txt"
+      - "src/**"
+      - "artifacts/cxr_mobilenetv3.pt"
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install CPU runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install "torch>=2.3,<3" "torchvision>=0.18,<1" --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-app.txt
+      - name: Start Streamlit
+        run: |
+          streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true > /tmp/streamlit.log 2>&1 &
+          echo $! > /tmp/streamlit.pid
+      - name: Verify HTTP health
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8501/ >/dev/null; then
+              echo "Streamlit is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/streamlit.log
+          exit 1
