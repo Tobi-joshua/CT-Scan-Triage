@@ -13,6 +13,7 @@ from PIL import Image
 from torchvision import transforms
 
 from src.model import build_model, mc_predict, mc_predict_multilabel
+from src.ensemble import ensemble_predict
 from src.gradcam import GradCAM, overlay_cam
 from src.data import IMAGENET_MEAN, IMAGENET_STD
 
@@ -27,6 +28,8 @@ PED_PATH = Path("artifacts/cxr_mobilenetv3.pt")
 PED_METRICS = Path("artifacts/test_metrics.json")
 NIH_PATH = Path("artifacts/cxr_nih_multilabel.pt")
 NIH_METRICS = Path("artifacts/nih_multilabel_metrics.json")
+ENSEMBLE_PATHS = [Path("artifacts/cxr_mobilenetv3.pt"), Path("artifacts/cxr_seed_2027.pt"), Path("artifacts/cxr_seed_2028.pt")]
+ENSEMBLE_METRICS = Path("artifacts/ensemble_metrics.json")
 
 @st.cache_resource
 def load_checkpoint(path_string: str):
@@ -75,6 +78,13 @@ def model_transform(size: int):
 
 ped_model, ped_ckpt = load_checkpoint(str(PED_PATH))
 nih_model, nih_ckpt = load_checkpoint(str(NIH_PATH))
+ensemble_models = []
+ensemble_ckpts = []
+if all(p.exists() for p in ENSEMBLE_PATHS):
+    for p in ENSEMBLE_PATHS:
+        m, c = load_checkpoint(str(p))
+        ensemble_models.append(m)
+        ensemble_ckpts.append(c)
 
 with st.sidebar:
     st.header("System status")
@@ -86,6 +96,12 @@ with st.sidebar:
             st.caption(f"Sensitivity {m['recall_sensitivity']:.3f} • Specificity {m['specificity']:.3f}")
     else:
         st.error("Pediatric checkpoint missing")
+
+    if ensemble_models:
+        st.success("Three-member pediatric ensemble loaded")
+        if ENSEMBLE_METRICS.exists():
+            em = json.loads(ENSEMBLE_METRICS.read_text())
+            st.metric("Ensemble test AUC", f"{em['auc']:.3f}")
 
     if nih_model is not None:
         st.success("Adult NIH multi-label baseline loaded")
@@ -102,6 +118,8 @@ modality = st.radio("Modality", ["Chest X-ray", "CT (preview only)"], horizontal
 available_models = []
 if ped_model is not None:
     available_models.append("Pediatric pneumonia baseline")
+if ensemble_models:
+    available_models.append("Pediatric pneumonia deep ensemble")
 if nih_model is not None:
     available_models.append("Adult NIH 14-finding baseline")
 
@@ -159,6 +177,35 @@ if upload:
         st.caption(
             f"Epistemic uncertainty (mutual information): {mi.item():.4f}. "
             "This is a pediatric pneumonia research baseline, not an emergency triage decision."
+        )
+
+    elif selected_model == "Pediatric pneumonia deep ensemble":
+        size = int(ensemble_ckpts[0].get("input_size", 160))
+        x = model_transform(size)(image).unsqueeze(0)
+
+        t0 = time.perf_counter()
+        mean, var, entropy, mi = ensemble_predict(ensemble_models, x)
+        latency_ms = (time.perf_counter() - t0) * 1000
+        idx = int(mean.argmax(1).item())
+
+        cam_engine = GradCAM(ensemble_models[0], ensemble_models[0].features[-1])
+        cam, _ = cam_engine(x, idx)
+        cam_engine.close()
+        right.image(
+            overlay_cam(image, cam),
+            caption="Grad-CAM from ensemble member 1",
+            use_container_width=True,
+        )
+
+        st.subheader("Deep ensemble research output")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Predicted class", ensemble_ckpts[0]["classes"][idx])
+        c2.metric("Ensemble mean", f"{mean[0, idx].item():.3f}")
+        c3.metric("Between-model variance", f"{var[0, idx].item():.6f}")
+        c4.metric("3-member latency", f"{latency_ms:.0f} ms")
+        st.caption(
+            f"Ensemble mutual information: {mi.item():.4f}. "
+            "Member disagreement is an epistemic-uncertainty indicator, not a clinical guarantee."
         )
 
     elif selected_model == "Adult NIH 14-finding baseline":
