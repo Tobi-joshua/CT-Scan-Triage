@@ -133,21 +133,46 @@ if modality.startswith("CT"):
         "normalization, but no CXR model will be applied to them."
     )
 
-upload = st.file_uploader(
-    "Upload a de-identified chest image",
-    type=["png", "jpg", "jpeg", "dcm", "dicom"],
-    help="Do not upload identifiable patient data to this public research demo.",
+source = st.radio(
+    "Input source",
+    ["Upload de-identified image", "Synthetic interface example"],
+    horizontal=True,
 )
 
-if upload:
-    try:
-        image = uploaded_to_pil(upload, modality)
-    except Exception as exc:
-        st.error(f"Could not decode the uploaded image: {exc}")
-        st.stop()
+upload = None
+image = None
+is_synthetic_demo = False
+
+if source == "Upload de-identified image":
+    upload = st.file_uploader(
+        "Upload a de-identified chest image",
+        type=["png", "jpg", "jpeg", "dcm", "dicom"],
+        help="Do not upload identifiable patient data to this public research demo.",
+    )
+    if upload:
+        try:
+            image = uploaded_to_pil(upload, modality)
+        except Exception as exc:
+            st.error(f"Could not decode the uploaded image: {exc}")
+            st.stop()
+else:
+    demo_path = Path("images/cxr_synthetic.png" if modality == "Chest X-ray" else "images/ct_synthetic.png")
+    if demo_path.exists():
+        image = Image.open(demo_path).convert("RGB")
+        is_synthetic_demo = True
+        st.warning(
+            "Synthetic visualization example selected. Any model output shown for this image "
+            "is an interface demonstration only and is not a performance result or clinical example."
+        )
+
+if image is not None:
 
     left, right = st.columns(2)
-    left.image(image, caption="De-identified input preview", use_container_width=True)
+    left.image(
+        image,
+        caption="Synthetic interface example" if is_synthetic_demo else "De-identified input preview",
+        use_container_width=True,
+    )
 
     if modality.startswith("CT"):
         right.info("CT preview only — no diagnostic or triage prediction is produced.")
